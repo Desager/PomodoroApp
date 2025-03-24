@@ -7,6 +7,4 @@ interface TimerManager {
     fun start(timerAdapterListener: TimerAdapterListener)
 
     fun stop()
-
-    fun finish()
 }

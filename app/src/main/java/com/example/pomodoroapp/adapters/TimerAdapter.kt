@@ -65,14 +65,6 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
         timer = null
     }
 
-    override fun finish() {
-        workingTimer?.stop()
-        workingTimer = null
-
-        timer?.cancel()
-        timer = null
-    }
-
     inner class TimerViewHolder(
         private val binding: TimerViewholderBinding,
         private val resources: Resources
@@ -142,7 +134,7 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
                 }
 
                 override fun onFinish() {
-                    this@TimerAdapter.finish()
+                    this@TimerAdapter.stop()
                     setIsRecyclable(true)
                     timerData.currentS = timerData.totalS
                     binding.timer.text = timerData.currentS.displayTime()
