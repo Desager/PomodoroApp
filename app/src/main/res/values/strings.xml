@@ -1,3 +1,13 @@
 <resources>
-    <string name="app_name">PomodoroApp</string>
+    <string name="app_name">Pomodoro</string>
+
+    <string name="time">%02d:%02d:%02d</string>
+    <string name="add_timer">Add timer</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+
+    <string name="warning_empty">You need to specify timer duration!</string>
+    <string name="warning_zero">Time can\'t be zero!</string>
+
+    <string name="hint_input">Seconds</string>
 </resources>

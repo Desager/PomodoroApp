@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="MainButtonStyle" parent="Widget.AppCompat.Button">
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="android:backgroundTint">?attr/colorPrimary</item>
+
+        <item name="android:textSize">18sp</item>
+    </style>
+</resources>
