@@ -7,7 +7,7 @@
     <string name="stop">Stop</string>
 
     <string name="warning_empty">You need to specify timer duration!</string>
-    <string name="warning_zero">Time can\'t be zero!</string>
+    <string name="warning_zero">Timer duration can\'t be zero!</string>
 
     <string name="hint_input">Seconds</string>
 </resources>

@@ -4,7 +4,7 @@ interface TimerManager {
 
     fun delete(timerAdapterListener: TimerAdapterListener)
 
-    fun start(timerAdapterListener: TimerAdapterListener)
+    fun start(timerAdapterListener: TimerAdapterListener, millisInFuture: Long)
 
     fun stop()
 }

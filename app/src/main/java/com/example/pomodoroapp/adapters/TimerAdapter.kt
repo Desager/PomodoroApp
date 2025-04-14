@@ -21,7 +21,6 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
 
     private var nextId = 0
     private var timer: CountDownTimer? = null
-    private val timersData: MutableList<TimerData> = mutableListOf()
     private var workingTimer: TimerAdapterListener? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TimerViewHolder {
@@ -35,34 +34,52 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
     }
 
     override fun add(seconds: Long) {
-        timersData.add(TimerData(nextId++, seconds))
-        submitList(timersData.toList())
+        val newList = currentList.toMutableList().apply { add(TimerData(nextId++, seconds)) }
+        submitList(newList)
     }
 
     override fun delete(timerAdapterListener: TimerAdapterListener) {
         if (workingTimer?.id == timerAdapterListener.id) {
             stop()
         }
-        timersData.remove(timersData.find { it.id == timerAdapterListener.id })
-        submitList(timersData.toList())
+        timerAdapterListener.onDelete()
+        val newList = currentList.toMutableList().apply { remove(find { it.id == timerAdapterListener.id }) }
+        submitList(newList)
     }
 
-    override fun start(timerAdapterListener: TimerAdapterListener) {
-        workingTimer?.stop()
-        workingTimer = timerAdapterListener
-        workingTimer?.start()
+    override fun start(timerAdapterListener: TimerAdapterListener, millisInFuture: Long) {
+        if (workingTimer?.id != timerAdapterListener.id) {
+            workingTimer?.onStop()
 
-        timer?.cancel()
-        timer = timerAdapterListener.getCountDownTimer()
-        timer?.start()
+            timer?.cancel()
+            timer = getCountDownTimer(millisInFuture)
+            timer?.start()
+        }
+        workingTimer = timerAdapterListener
+        workingTimer?.onStart()
     }
 
     override fun stop() {
-        workingTimer?.stop()
+        workingTimer?.onStop()
         workingTimer = null
 
         timer?.cancel()
         timer = null
+    }
+
+    private fun getCountDownTimer(millisInFuture: Long): CountDownTimer {
+        return object : CountDownTimer(millisInFuture, TICK_INTERVAL_S * 1000) {
+
+            override fun onTick(millisUntilFinished: Long) {
+                workingTimer?.onTick()
+            }
+
+            override fun onFinish() {
+                workingTimer?.onFinish()
+                workingTimer = null
+                timer = null
+            }
+        }
     }
 
     inner class TimerViewHolder(
@@ -70,7 +87,7 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
         private val resources: Resources
     ): RecyclerView.ViewHolder(binding.root), TimerAdapterListener {
 
-        lateinit var timerData: TimerData
+        private lateinit var timerData: TimerData
         override val id: Int get() = timerData.id
 
         fun bind(timerData: TimerData) {
@@ -78,16 +95,15 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             binding.timer.text = timerData.currentS.displayTime()
             binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
 
-
             if (timerData.isStarted) {
-                this@TimerAdapter.start(this)
+                start(this, timerData.currentS * 1000)
             }
 
             binding.startPauseButton.setOnClickListener {
                 if (timerData.isStarted) {
-                    this@TimerAdapter.stop()
+                    stop()
                 } else {
-                    this@TimerAdapter.start(this)
+                    start(this, timerData.currentS * 1000)
                 }
             }
 
@@ -107,7 +123,7 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             return resources.getString(R.string.time, h, m, s)
         }
 
-        override fun start() {
+        override fun onStart() {
             timerData.isStarted = true
             setIsRecyclable(false)
 
@@ -116,7 +132,7 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             (binding.blinkingIndicator.background as? AnimationDrawable)?.start()
         }
 
-        override fun stop() {
+        override fun onStop() {
             timerData.isStarted = false
 
             binding.startPauseButton.text = resources.getString(R.string.start)
@@ -124,23 +140,24 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             (binding.blinkingIndicator.background as? AnimationDrawable)?.stop()
         }
 
-        override fun getCountDownTimer(): CountDownTimer {
-            return object : CountDownTimer(timerData.currentS * 1000, TICK_INTERVAL_S * 1000) {
+        override fun onTick() {
+            timerData.currentS -= TICK_INTERVAL_S
 
-                override fun onTick(millisUntilFinished: Long) {
-                    timerData.currentS -= TICK_INTERVAL_S
-                    binding.timer.text = timerData.currentS.displayTime()
-                    binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
-                }
+            binding.timer.text = timerData.currentS.displayTime()
+            binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
+        }
 
-                override fun onFinish() {
-                    this@TimerAdapter.stop()
-                    setIsRecyclable(true)
-                    timerData.currentS = timerData.totalS
-                    binding.timer.text = timerData.currentS.displayTime()
-                    binding.progressBar.resetProgress()
-                }
-            }
+        override fun onFinish() {
+            onStop()
+            setIsRecyclable(true)
+
+            timerData.currentS = timerData.totalS
+            binding.timer.text = timerData.currentS.displayTime()
+            binding.progressBar.resetProgress()
+        }
+
+        override fun onDelete() {
+            setIsRecyclable(true)
         }
     }
 

@@ -1,14 +1,16 @@
 package com.example.pomodoroapp.interfaces
 
-import android.os.CountDownTimer
-
 interface TimerAdapterListener {
 
     val id: Int
 
-    fun start()
+    fun onStart()
 
-    fun stop()
+    fun onStop()
 
-    fun getCountDownTimer(): CountDownTimer
+    fun onTick()
+
+    fun onFinish()
+
+    fun onDelete()
 }
