@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
 
 class PieProgressBar @JvmOverloads constructor(
@@ -33,8 +32,6 @@ class PieProgressBar @JvmOverloads constructor(
     }
 
     fun setProgress(progressPercent: Float) {
-        Log.d(DEBUG_TAG, "Timer progress: $progressPercent")
-
         this.progressPercent = progressPercent
         invalidate()
     }
@@ -46,7 +43,5 @@ class PieProgressBar @JvmOverloads constructor(
     private companion object {
         private const val START_ANGLE = -90F
         private const val START_PROGRESS = 1F
-
-        private const val DEBUG_TAG = "TIMER"
     }
 }

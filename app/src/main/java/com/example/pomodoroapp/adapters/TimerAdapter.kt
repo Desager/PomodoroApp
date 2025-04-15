@@ -2,7 +2,6 @@ package com.example.pomodoroapp.adapters
 
 import android.content.res.Resources
 import android.graphics.drawable.AnimationDrawable
-import android.os.CountDownTimer
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.view.isInvisible
@@ -11,18 +10,11 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.pomodoroapp.R
 import com.example.pomodoroapp.databinding.TimerViewholderBinding
-import com.example.pomodoroapp.interfaces.MainActivityListener
-import com.example.pomodoroapp.interfaces.TimerAdapterListener
-import com.example.pomodoroapp.interfaces.TimerManager
+import com.example.pomodoroapp.interfaces.TimerManagerListener
 import com.example.pomodoroapp.items.TimerData
+import com.example.pomodoroapp.utility.TimerManagerImpl
 
-class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemComparator),
-    MainActivityListener, TimerManager {
-
-    private var nextId = 0
-    private var timer: CountDownTimer? = null
-    private val timersData: MutableList<TimerData> = mutableListOf()
-    private var workingTimer: TimerAdapterListener? = null
+class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemComparator) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TimerViewHolder {
         val layoutInflater = LayoutInflater.from(parent.context)
@@ -34,65 +26,32 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
         holder.bind(getItem(position))
     }
 
-    override fun add(seconds: Long) {
-        timersData.add(TimerData(nextId++, seconds))
-        submitList(timersData.toList())
-    }
-
-    override fun delete(timerAdapterListener: TimerAdapterListener) {
-        if (workingTimer?.id == timerAdapterListener.id) {
-            stop()
-        }
-        timersData.remove(timersData.find { it.id == timerAdapterListener.id })
-        submitList(timersData.toList())
-    }
-
-    override fun start(timerAdapterListener: TimerAdapterListener) {
-        workingTimer?.stop()
-        workingTimer = timerAdapterListener
-        workingTimer?.start()
-
-        timer?.cancel()
-        timer = timerAdapterListener.getCountDownTimer()
-        timer?.start()
-    }
-
-    override fun stop() {
-        workingTimer?.stop()
-        workingTimer = null
-
-        timer?.cancel()
-        timer = null
-    }
-
     inner class TimerViewHolder(
         private val binding: TimerViewholderBinding,
         private val resources: Resources
-    ): RecyclerView.ViewHolder(binding.root), TimerAdapterListener {
-
-        lateinit var timerData: TimerData
-        override val id: Int get() = timerData.id
+    ): RecyclerView.ViewHolder(binding.root), TimerManagerListener {
 
         fun bind(timerData: TimerData) {
-            this.timerData = timerData
             binding.timer.text = timerData.currentS.displayTime()
             binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
 
-
             if (timerData.isStarted) {
-                this@TimerAdapter.start(this)
+                TimerManagerImpl.start(timerData.id, timerData.currentS * 1000)
+                TimerManagerImpl.attachListener(this)
             }
 
             binding.startPauseButton.setOnClickListener {
                 if (timerData.isStarted) {
-                    this@TimerAdapter.stop()
+                    TimerManagerImpl.stop()
                 } else {
-                    this@TimerAdapter.start(this)
+                    TimerManagerImpl.start(timerData.id, timerData.currentS * 1000)
+                    TimerManagerImpl.attachListener(this)
                 }
             }
 
             binding.deleteButton.setOnClickListener {
-                delete(this)
+                TimerManagerImpl.delete(timerData.id)
+                submitList(TimerManagerImpl.getList())
             }
         }
 
@@ -107,8 +66,7 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             return resources.getString(R.string.time, h, m, s)
         }
 
-        override fun start() {
-            timerData.isStarted = true
+        override fun onStart(timerData: TimerData) {
             setIsRecyclable(false)
 
             binding.startPauseButton.text = resources.getString(R.string.stop)
@@ -116,37 +74,31 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             (binding.blinkingIndicator.background as? AnimationDrawable)?.start()
         }
 
-        override fun stop() {
-            timerData.isStarted = false
-
+        override fun onStop(timerData: TimerData) {
             binding.startPauseButton.text = resources.getString(R.string.start)
             binding.blinkingIndicator.isInvisible = true
             (binding.blinkingIndicator.background as? AnimationDrawable)?.stop()
         }
 
-        override fun getCountDownTimer(): CountDownTimer {
-            return object : CountDownTimer(timerData.currentS * 1000, TICK_INTERVAL_S * 1000) {
+        override fun onTick(timerData: TimerData) {
+            binding.timer.text = timerData.currentS.displayTime()
+            binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
+        }
 
-                override fun onTick(millisUntilFinished: Long) {
-                    timerData.currentS -= TICK_INTERVAL_S
-                    binding.timer.text = timerData.currentS.displayTime()
-                    binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
-                }
+        override fun onFinish(timerData: TimerData) {
+            onStop(timerData)
+            setIsRecyclable(true)
 
-                override fun onFinish() {
-                    this@TimerAdapter.stop()
-                    setIsRecyclable(true)
-                    timerData.currentS = timerData.totalS
-                    binding.timer.text = timerData.currentS.displayTime()
-                    binding.progressBar.resetProgress()
-                }
-            }
+            binding.timer.text = timerData.currentS.displayTime()
+            binding.progressBar.resetProgress()
+        }
+
+        override fun onDelete() {
+            setIsRecyclable(true)
         }
     }
 
     private companion object {
-
-        private const val TICK_INTERVAL_S = 1L
 
         private val itemComparator = object : DiffUtil.ItemCallback<TimerData>() {
 
