@@ -11,11 +11,14 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.pomodoroapp.MainActivity
 import com.example.pomodoroapp.R
-import com.example.pomodoroapp.interfaces.TimerManagerListener
-import com.example.pomodoroapp.items.TimerData
-import com.example.pomodoroapp.utility.TimerManagerImpl
+import com.example.pomodoroapp.timer_manager.TimerData
+import com.example.pomodoroapp.timer_manager.TimerManager
+import com.example.pomodoroapp.timer_manager.TimerManagerListener
+import com.example.pomodoroapp.utils.displayTime
 
 class ForegroundService : Service(), TimerManagerListener {
+
+    private val timerManager = TimerManager.getInstance()
 
     private var isServiceStarted = false
     private var notificationManager: NotificationManager? = null
@@ -35,11 +38,11 @@ class ForegroundService : Service(), TimerManagerListener {
     override fun onTick(timerData: TimerData) {
         notificationManager?.notify(
             NOTIFICATION_ID,
-            getNotification(timerData.currentS.displayTime())
+            getNotification(timerData.currentS.displayTime(resources))
         )
     }
 
-    override fun onFinish(timerData: TimerData) {
+    override fun onFinish() {
         commandStop()
     }
 
@@ -59,24 +62,21 @@ class ForegroundService : Service(), TimerManagerListener {
     private fun processCommand(intent: Intent?) {
         when (intent?.extras?.getString(COMMAND_ID) ?: COMMAND_INVALID) {
             COMMAND_START -> {
-                val timerDataId = intent?.extras?.getInt(TIMER_DATA_ID)
-                val timerData = TimerManagerImpl.getList().find { it.id == timerDataId } ?: return
-                commandStart(timerData)
+                commandStart()
             }
             COMMAND_STOP -> commandStop()
             COMMAND_INVALID -> return
         }
     }
 
-    private fun commandStart(timerData: TimerData) {
+    private fun commandStart() {
         if (isServiceStarted) {
             return
         }
         try {
             moveToStartedState()
             startForegroundAndShowNotification()
-            TimerManagerImpl.start(timerData.id, timerData.currentS * 1000)
-            TimerManagerImpl.attachListener(this)
+            timerManager.attachListener(this)
         } finally {
             isServiceStarted = true
         }
@@ -87,7 +87,7 @@ class ForegroundService : Service(), TimerManagerListener {
             return
         }
         try {
-            TimerManagerImpl.detachListener(this)
+            timerManager.detachListener(this)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             notificationManager?.cancel(NOTIFICATION_ID)
@@ -106,22 +106,11 @@ class ForegroundService : Service(), TimerManagerListener {
 
     private fun startForegroundAndShowNotification() {
         createChannel()
-        val notification = getNotification("")
+        val notification = getNotification()
         startForeground(NOTIFICATION_ID, notification)
     }
 
-    private fun Long.displayTime(): String {
-        if (this <= 0L) {
-            return resources.getString(R.string.time, 0, 0, 0)
-        }
-        val h = this / 3600
-        val m = this % 3600 / 60
-        val s = this % 60
-
-        return resources.getString(R.string.time, h, m, s)
-    }
-
-    private fun getNotification(content: String) = builder.setContentTitle(content).build()
+    private fun getNotification(content: String = "") = builder.setContentTitle(content).build()
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -133,13 +122,11 @@ class ForegroundService : Service(), TimerManagerListener {
     private fun getPendingIntent(): PendingIntent {
         val resultIntent = Intent(this, MainActivity::class.java)
         resultIntent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-        return PendingIntent.getActivity(this, 0, resultIntent,
+        return PendingIntent.getActivity(this, MAIN_ACTIVITY_REQUEST_CODE, resultIntent,
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
     }
 
     companion object {
-
-        const val TIMER_DATA_ID = "TIMER_DATA_ID"
 
         private const val CONTENT_TITLE = "Timer"
         private const val GROUP = "Timer"
@@ -152,5 +139,7 @@ class ForegroundService : Service(), TimerManagerListener {
         const val COMMAND_START = "COMMAND_START"
         const val COMMAND_STOP = "COMMAND_STOP"
         private const val COMMAND_INVALID = "INVALID"
+
+        private const val MAIN_ACTIVITY_REQUEST_CODE = 0
     }
 }
