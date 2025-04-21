@@ -10,11 +10,15 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.pomodoroapp.R
 import com.example.pomodoroapp.databinding.TimerViewholderBinding
-import com.example.pomodoroapp.interfaces.TimerManagerListener
-import com.example.pomodoroapp.items.TimerData
-import com.example.pomodoroapp.utility.TimerManagerImpl
+import com.example.pomodoroapp.timer_manager.TimerData
+import com.example.pomodoroapp.timer_manager.TimerManager
+import com.example.pomodoroapp.timer_manager.TimerManagerListener
+import com.example.pomodoroapp.utils.displayTime
 
-class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemComparator) {
+class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemComparator),
+    TimerManagerListener {
+
+    private val timerManager = TimerManager.getInstance()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TimerViewHolder {
         val layoutInflater = LayoutInflater.from(parent.context)
@@ -26,75 +30,57 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
         holder.bind(getItem(position))
     }
 
+    override fun onStart() = submitList(timerManager.getList())
+
+    override fun onStop() = submitList(timerManager.getList())
+
+    override fun onTick(timerData: TimerData) = submitList(timerManager.getList())
+
+    override fun onFinish() = submitList(timerManager.getList())
+
+    override fun onDelete() = submitList(timerManager.getList())
+
     inner class TimerViewHolder(
         private val binding: TimerViewholderBinding,
         private val resources: Resources
-    ): RecyclerView.ViewHolder(binding.root), TimerManagerListener {
+    ): RecyclerView.ViewHolder(binding.root) {
 
         fun bind(timerData: TimerData) {
-            binding.timer.text = timerData.currentS.displayTime()
+            binding.timer.text = timerData.currentS.displayTime(resources)
             binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
 
             if (timerData.isStarted) {
-                TimerManagerImpl.start(timerData.id, timerData.currentS * 1000)
-                TimerManagerImpl.attachListener(this)
+                binding.startPauseButton.text = resources.getString(R.string.stop)
+                binding.blinkingIndicator.isInvisible = false
+                val blinkingIndicatorBackground = (binding.blinkingIndicator.background as? AnimationDrawable)
+                if (blinkingIndicatorBackground?.isRunning == false) {
+                    blinkingIndicatorBackground.start()
+                }
+            } else {
+                binding.startPauseButton.text = resources.getString(R.string.start)
+                binding.blinkingIndicator.isInvisible = true
+                (binding.blinkingIndicator.background as? AnimationDrawable)?.stop()
+            }
+
+            if (timerData.isFinished) {
+                binding.timer.text = timerData.currentS.displayTime(resources)
+                binding.progressBar.resetProgress()
+                binding.root.setBackgroundColor(resources.getColor(R.color.red_200, binding.root.context.theme))
+            } else {
+                binding.root.setBackgroundColor(resources.getColor(R.color.white, binding.root.context.theme))
             }
 
             binding.startPauseButton.setOnClickListener {
                 if (timerData.isStarted) {
-                    TimerManagerImpl.stop()
+                    timerManager.stop()
                 } else {
-                    TimerManagerImpl.start(timerData.id, timerData.currentS * 1000)
-                    TimerManagerImpl.attachListener(this)
+                    timerManager.start(timerData.id)
                 }
             }
 
             binding.deleteButton.setOnClickListener {
-                TimerManagerImpl.delete(timerData.id)
-                submitList(TimerManagerImpl.getList())
+                timerManager.delete(timerData.id)
             }
-        }
-
-        private fun Long.displayTime(): String {
-            if (this <= 0L) {
-                return resources.getString(R.string.time, 0, 0, 0)
-            }
-            val h = this / 3600
-            val m = this % 3600 / 60
-            val s = this % 60
-
-            return resources.getString(R.string.time, h, m, s)
-        }
-
-        override fun onStart(timerData: TimerData) {
-            setIsRecyclable(false)
-
-            binding.startPauseButton.text = resources.getString(R.string.stop)
-            binding.blinkingIndicator.isInvisible = false
-            (binding.blinkingIndicator.background as? AnimationDrawable)?.start()
-        }
-
-        override fun onStop(timerData: TimerData) {
-            binding.startPauseButton.text = resources.getString(R.string.start)
-            binding.blinkingIndicator.isInvisible = true
-            (binding.blinkingIndicator.background as? AnimationDrawable)?.stop()
-        }
-
-        override fun onTick(timerData: TimerData) {
-            binding.timer.text = timerData.currentS.displayTime()
-            binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
-        }
-
-        override fun onFinish(timerData: TimerData) {
-            onStop(timerData)
-            setIsRecyclable(true)
-
-            binding.timer.text = timerData.currentS.displayTime()
-            binding.progressBar.resetProgress()
-        }
-
-        override fun onDelete() {
-            setIsRecyclable(true)
         }
     }
 
@@ -107,9 +93,13 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             }
 
             override fun areContentsTheSame(oldItem: TimerData, newItem: TimerData): Boolean {
-                return oldItem.currentS == newItem.currentS &&
-                        oldItem.isStarted == newItem.isStarted
+                return oldItem.totalS == newItem.totalS &&
+                        oldItem.currentS == newItem.currentS &&
+                        oldItem.isStarted == newItem.isStarted &&
+                        oldItem.isFinished == newItem.isFinished
             }
+
+            override fun getChangePayload(oldItem: TimerData, newItem: TimerData) = Any()
         }
     }
 }
