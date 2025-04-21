@@ -1,6 +1,6 @@
 <resources>
     <!-- Base application theme. -->
-    <style name="Theme.PomodoroApp" parent="Theme.MaterialComponents.DayNight">
+    <style name="Theme.PomodoroApp" parent="Theme.MaterialComponents.Light">
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/red_500</item>
         <item name="colorOnPrimary">@color/white</item>
