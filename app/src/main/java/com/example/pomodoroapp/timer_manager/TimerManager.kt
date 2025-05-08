@@ -2,7 +2,7 @@ package com.example.pomodoroapp.timer_manager
 
 import android.os.CountDownTimer
 
-class TimerManager private constructor() {
+class TimerManager {
 
     private var nextId = 0
     private val currentList: MutableList<TimerData> = mutableListOf()
@@ -11,6 +11,8 @@ class TimerManager private constructor() {
     private val listeners: MutableList<TimerManagerListener> = mutableListOf()
 
     fun isStarted() = timer != null
+
+    fun isEmpty() = currentList.isEmpty()
 
     fun attachListener(timerManagerListener: TimerManagerListener) {
         if (timerManagerListener in listeners) {
@@ -24,7 +26,7 @@ class TimerManager private constructor() {
     }
 
     fun getList(): List<TimerData> {
-        return currentList.map { it.copy() }
+        return currentList.toList()
     }
 
     fun setList(timerList: List<TimerData>) {
@@ -53,7 +55,9 @@ class TimerManager private constructor() {
             return
         }
         timer?.stop()
-        timer = Timer(getTimerData(id))
+        val timerDataIndex = getTimerDataIndex(id)
+        val timerData = currentList[timerDataIndex]
+        timer = Timer(timerDataIndex, timerData)
         timer?.start()
     }
 
@@ -66,26 +70,35 @@ class TimerManager private constructor() {
         listeners.forEach(action)
     }
 
-    private fun getTimerData(id: Int): TimerData {
-        return requireNotNull(currentList.find { it.id == id })
+    private fun getTimerDataIndex(id: Int): Int {
+        return requireNotNull(currentList.indexOfFirst { it.id == id })
+    }
+
+    private fun changeTimerData(index: Int, newTimerData: TimerData): TimerData {
+        currentList[index] = newTimerData
+        return newTimerData
     }
 
     inner class Timer(
-        private val timerData: TimerData
+        private val timerDataIndex: Int,
+        private var timerData: TimerData
     ) {
-
         val id = timerData.id
         private val countDownTimer: CountDownTimer = getCountDownTimer(timerData.currentS * 1000)
 
         fun start() {
-            timerData.isStarted = true
-            timerData.isFinished = false
+            timerData = changeTimerData(timerDataIndex, timerData.copy(
+                isStarted = true,
+                isFinished = false
+            ))
             countDownTimer.start()
         }
 
         fun stop() {
             countDownTimer.cancel()
-            timerData.isStarted = false
+            timerData = changeTimerData(timerDataIndex, timerData.copy(
+                isStarted = false
+            ))
             notifyAll { onStop() }
         }
 
@@ -93,14 +106,18 @@ class TimerManager private constructor() {
             return object : CountDownTimer(millisInFuture, TICK_INTERVAL_S * 1000) {
 
                 override fun onTick(millisUntilFinished: Long) {
-                    timerData.currentS -= TICK_INTERVAL_S
-                    notifyAll { onTick(timerData.copy()) }
+                    timerData = changeTimerData(timerDataIndex, timerData.copy(
+                        currentS = timerData.currentS - TICK_INTERVAL_S
+                    ))
+                    notifyAll { onTick(timerData) }
                 }
 
                 override fun onFinish() {
-                    timerData.currentS = timerData.totalS
-                    timerData.isStarted = false
-                    timerData.isFinished = true
+                    timerData = changeTimerData(timerDataIndex, timerData.copy(
+                        currentS = timerData.totalS,
+                        isStarted = false,
+                        isFinished = true
+                    ))
                     notifyAll { onFinish() }
                     timer = null
                 }
@@ -111,8 +128,5 @@ class TimerManager private constructor() {
     companion object {
 
         private const val TICK_INTERVAL_S = 1L
-        private val instance = TimerManager()
-
-        fun getInstance() = instance
     }
 }

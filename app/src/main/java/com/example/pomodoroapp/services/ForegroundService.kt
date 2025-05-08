@@ -9,19 +9,22 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.example.pomodoroapp.MainActivity
+import com.example.pomodoroapp.PomodoroApplication
 import com.example.pomodoroapp.R
+import com.example.pomodoroapp.activities.MainActivity
+import com.example.pomodoroapp.preferences.Preferences
 import com.example.pomodoroapp.timer_manager.TimerData
-import com.example.pomodoroapp.timer_manager.TimerManager
 import com.example.pomodoroapp.timer_manager.TimerManagerListener
 import com.example.pomodoroapp.utils.displayTime
 
 class ForegroundService : Service(), TimerManagerListener {
 
-    private val timerManager = TimerManager.getInstance()
+    private val timerManager by lazy { (application as PomodoroApplication).timerManager }
 
     private var isServiceStarted = false
     private var notificationManager: NotificationManager? = null
+
+    private val preferences by lazy { Preferences(this) }
 
     private val builder by lazy {
         NotificationCompat.Builder(this, CHANNEL_ID)
@@ -52,6 +55,7 @@ class ForegroundService : Service(), TimerManagerListener {
 
     override fun onCreate() {
         notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -59,12 +63,14 @@ class ForegroundService : Service(), TimerManagerListener {
         return START_REDELIVER_INTENT
     }
 
+    override fun onDestroy() {
+        preferences.saveList(timerManager.getList())
+        commandStop()
+    }
+
     private fun processCommand(intent: Intent?) {
         when (intent?.extras?.getString(COMMAND_ID) ?: COMMAND_INVALID) {
-            COMMAND_START -> {
-                commandStart()
-            }
-            COMMAND_STOP -> commandStop()
+            COMMAND_START -> commandStart()
             COMMAND_INVALID -> return
         }
     }
@@ -74,8 +80,7 @@ class ForegroundService : Service(), TimerManagerListener {
             return
         }
         try {
-            moveToStartedState()
-            startForegroundAndShowNotification()
+            startForeground(NOTIFICATION_ID, getNotification())
             timerManager.attachListener(this)
         } finally {
             isServiceStarted = true
@@ -96,23 +101,9 @@ class ForegroundService : Service(), TimerManagerListener {
         }
     }
 
-    private fun moveToStartedState() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(Intent(this, ForegroundService::class.java))
-        } else {
-            startService(Intent(this, ForegroundService::class.java))
-        }
-    }
-
-    private fun startForegroundAndShowNotification() {
-        createChannel()
-        val notification = getNotification()
-        startForeground(NOTIFICATION_ID, notification)
-    }
-
     private fun getNotification(content: String = "") = builder.setContentTitle(content).build()
 
-    private fun createChannel() {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationChannel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT)
             notificationManager?.createNotificationChannel(notificationChannel)
@@ -137,7 +128,6 @@ class ForegroundService : Service(), TimerManagerListener {
 
         const val COMMAND_ID = "SERVICE_COMMAND"
         const val COMMAND_START = "COMMAND_START"
-        const val COMMAND_STOP = "COMMAND_STOP"
         private const val COMMAND_INVALID = "INVALID"
 
         private const val MAIN_ACTIVITY_REQUEST_CODE = 0

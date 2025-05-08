@@ -15,10 +15,10 @@ import com.example.pomodoroapp.timer_manager.TimerManager
 import com.example.pomodoroapp.timer_manager.TimerManagerListener
 import com.example.pomodoroapp.utils.displayTime
 
-class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemComparator),
+class TimerAdapter(
+    private val timerManager: TimerManager
+): ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemComparator),
     TimerManagerListener {
-
-    private val timerManager = TimerManager.getInstance()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TimerViewHolder {
         val layoutInflater = LayoutInflater.from(parent.context)
@@ -29,8 +29,6 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
     override fun onBindViewHolder(holder: TimerViewHolder, position: Int) {
         holder.bind(getItem(position))
     }
-
-    override fun onStart() = submitList(timerManager.getList())
 
     override fun onStop() = submitList(timerManager.getList())
 
@@ -50,12 +48,12 @@ class TimerAdapter: ListAdapter<TimerData, TimerAdapter.TimerViewHolder>(itemCom
             binding.progressBar.setProgress(timerData.currentS.toFloat() / timerData.totalS)
 
             if (timerData.isStarted) {
+                if (!timerManager.isStarted()) {
+                    timerManager.start(timerData.id)
+                }
                 binding.startPauseButton.text = resources.getString(R.string.stop)
                 binding.blinkingIndicator.isInvisible = false
-                val blinkingIndicatorBackground = (binding.blinkingIndicator.background as? AnimationDrawable)
-                if (blinkingIndicatorBackground?.isRunning == false) {
-                    blinkingIndicatorBackground.start()
-                }
+                (binding.blinkingIndicator.background as? AnimationDrawable)?.start()
             } else {
                 binding.startPauseButton.text = resources.getString(R.string.start)
                 binding.blinkingIndicator.isInvisible = true
