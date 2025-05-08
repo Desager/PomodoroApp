@@ -2,7 +2,7 @@ package com.example.pomodoroapp.timer_manager
 
 import android.os.CountDownTimer
 
-class TimerManager private constructor() {
+class TimerManager {
 
     private var nextId = 0
     private val currentList: MutableList<TimerData> = mutableListOf()
@@ -11,6 +11,8 @@ class TimerManager private constructor() {
     private val listeners: MutableList<TimerManagerListener> = mutableListOf()
 
     fun isStarted() = timer != null
+
+    fun isEmpty() = currentList.isEmpty()
 
     fun attachListener(timerManagerListener: TimerManagerListener) {
         if (timerManagerListener in listeners) {
@@ -81,6 +83,7 @@ class TimerManager private constructor() {
             timerData.isStarted = true
             timerData.isFinished = false
             countDownTimer.start()
+            notifyAll { onStart() }
         }
 
         fun stop() {
@@ -111,8 +114,5 @@ class TimerManager private constructor() {
     companion object {
 
         private const val TICK_INTERVAL_S = 1L
-        private val instance = TimerManager()
-
-        fun getInstance() = instance
     }
 }
